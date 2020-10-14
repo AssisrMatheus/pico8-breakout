@@ -62,6 +62,10 @@ function _update60()
  ball_x+=ball_dx
  ball_y+=ball_dy
  
+ 
+ if ball_box(pad_x, pad_y, pad_w, pad_h) then
+ 	-- deal with collision
+ end
 end
 
 function _draw()
@@ -75,6 +79,9 @@ function _draw()
 	rectfill(pad_x,pad_y, pad_x+pad_w,pad_y+pad_h,paddle_col)
 end
 
+function ball_box(box_x, box_y, box_w, box_h)
+	return false
+end
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
