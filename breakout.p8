@@ -1,49 +1,140 @@
 pico-8 cartridge // http://www.pico-8.com
 version 29
 __lua__
-function _init()
-	cls()
-	mode="start"
+-- Returns whether or not the ball hit a box
+function hit_ballbox(bx,by,tx,ty,tw,th)
+	if by-ball_r > ty+th then return false end
+	if by+ball_r < ty then return false end
+	if bx-ball_r > tx+tw then return false end
+	if bx+ball_r < tx then return false end
+	return true
 end
 
-function _update60()
-	if mode =="game" then
-		update_game()
-	elseif mode == "start" then
-		update_start()
-	elseif mode == "gameover" then
-		update_gameover()
+-- calculate where to deflect the ball
+-- horizontally or vertically when it hits a box
+function deflx_ballbox(bx,by,bdx,bdy,tx,ty,tw,th)
+	if bdx == 0 then
+	 -- moving vertically
+	 return false
+	elseif bdy == 0 then
+	 -- moving horizontally
+	 return true
+	else
+	 -- moving diagonally
+	 -- calculate slope
+	 local slp = bdy / bdx
+	 local cx, cy
+	 -- check variants
+	 if slp > 0 and bdx > 0 then
+		-- moving down right
+		cx = tx-bx
+		cy = ty-by
+		return cx > 0 and cy/cx < slp
+	 elseif slp < 0 and bdx > 0 then
+		-- moving up right
+		cx = tx-bx
+		cy = ty+th-by
+		return cx > 0 and cy/cx >= slp
+	 elseif slp > 0 and bdx < 0 then
+		-- moving left up
+		cx = tx+tw-bx
+		cy = ty+th-by
+		return cx < 0 and cy/cx <= slp
+	 else
+		-- moving left down
+		cx = tx+tw-bx
+		cy = ty-by
+		return cx < 0 and cy/cx >= slp		
+	 end
+	end
+	return false
+end
+
+-- creates the brick structure
+function buildbricks()
+	brick_x={}
+	brick_y={}
+	brick_v={}
+
+	local i
+	-- for each brick
+	for i=1,66 do
+		-- calculate its x position
+		add(brick_x, 4+((i-1)%11)*(brick_w+2))
+
+		-- calculate its y position
+		add(brick_y, 20+flr((i-1)/11)*(brick_h+2))
+
+		-- calculate its visibility
+		add(brick_v, true)
 	end
 end
 
-function _draw()
-	if mode =="game" then
-		draw_game()
-	elseif mode == "start" then
-		draw_start()
-	elseif mode == "gameover" then
-		draw_gameover()
-	end
+-- makes a new ball
+function serveball() 
+	--ball position
+	ball_x=10
+	ball_y=70
+	
+	-- ball speed
+	ball_dx=1
+	ball_dy=1
 end
 
-function draw_start()
-	print('pico hero breakout', 30, 40, 7)
-	print('press ❎ to start',32,80,11)
+-- A function that starts/restarts the game
+function startgame()
+	mode="game"
+
+	-- ball radius
+	ball_r=2	
+	-- ball radius speed?
+	ball_dr=0.5
+
+	-- color of the ball
+	col=10
+
+	-- color of the paddle
+	paddle_col=7
+
+	-- paddle values
+	pad_x=52
+	pad_y=120
+	pad_w=24
+	pad_h=3
+
+	-- paddle current speed
+	pad_dx=0
+
+	-- paddle speed multiplier
+	pad_speed=2.5
+
+	-- the amount to be used as the pad weight for its slow down
+	pad_weight=1.3
+
+	-- declare the size of the bricks
+	brick_w=9
+	brick_h=4
+
+	-- make the bricks
+	buildbricks()
+
+	-- declare the initial score
+	lives=3
+	points=0
+
+	-- serves a ball
+	serveball()
 end
 
-function draw_gameover()
-	rectfill(0, 60, 128, 75, 0)
-	print("game over", 45, 62, 7)
-	print("press ❎ to restart", 25, 69, 6)
+-- ends the game
+function gameover()
+	mode="gameover"
 end
+
+-- ############## UPDATES
 
 function update_start()
-	if btn(❎) then
-		startgame()
-	end
-end
-
-function update_gameover()
+	-- If the user press X, starts game
 	if btn(❎) then
 		startgame()
 	end
@@ -51,7 +142,6 @@ end
 
 function update_game()
 	local button_press=false 
-	local next_x, next_y
 	
 	--left
 	if btn(⬅️) then
@@ -67,40 +157,45 @@ function update_game()
 		--pad_x+=pad_speed
 	end
 	
+	-- if the user is not pressing the button, slows down the paddle
 	if not button_press then
-		pad_dx=pad_dx/1.4
+		pad_dx=pad_dx/pad_weight
 	end
 	
+	-- then move the paddle
 	pad_x+=pad_dx
+
+	-- clamp the pad to the middle of screen
 	pad_x=mid(0, pad_x, 127-pad_w)
 
+	
+	local next_x, next_y
+
+	-- get the next position of the ball
 	next_x = ball_x+ball_dx 
 	next_y = ball_y+ball_dy
 
- if next_x > 127 or next_x < 0 then
+	-- if the next position is out of bounds in the sides
+ if next_x > 124 or next_x < 3 then
+	-- make sure it stays inbounds
 	next_x = mid(0, next_x, 127)
+
+	-- reflect the ball to the opposite side
  	ball_dx = -ball_dx
  	sfx(0)
  end
 
+ -- if the next position is out of bounds in the top section
  if next_y < 10 then
+	-- make sure it stays inbounds
 	next_y = mid(10, next_y, 127)
+
+	-- reflect the ball to the opposite side
  	ball_dy = -ball_dy
  	sfx(0)
  end
 
- if next_y > 127 then
-	sfx(2)
-	lives-=1
-	if lives < 0 then
-		gameover()
-	else
-		serveball()
-	end	
-	return
- end
-
- -- check if ball hit pad
+ -- If ball hit the pad
  if hit_ballbox(next_x, next_y, pad_x, pad_y, pad_w, pad_h) then
 	points+=1
 	if deflx_ballbox(ball_x, ball_y, ball_dx, ball_dy, pad_x, pad_y, pad_w, pad_h) then
@@ -111,6 +206,7 @@ function update_game()
 	sfx(1)
  end
 
+ -- for each brick
  local i
  for i=1,#brick_x do
 	-- check if ball hit brick
@@ -127,7 +223,33 @@ function update_game()
 end
  
  ball_x = next_x
- ball_y = next_y
+ ball_y = next_y 
+
+ -- if the next position is out of bounds in the bottom section
+ if next_y > 127 then
+	sfx(2)
+	lives-=1
+	if lives < 0 then
+		gameover()
+	else
+		serveball()
+	end	
+	return
+ end
+end
+
+function updade_over()
+	if btn(❎) then
+		startgame()
+	end
+end
+
+-- ############## DRAWS
+
+function draw_start()
+	cls()
+	print('pico hero breakout',30,40,7)
+	print('press ❎ to start',32,80,11)
 end
 
 function draw_game()
@@ -147,141 +269,44 @@ function draw_game()
 		end
 	end
 
-	rectfill(0,0, 128, 6, 2)
-	print("lives "..lives, 1,1,7)
-	print("score "..points, 40,1,7)
+	rectfill(0,0,128,6,0)
+	print("lives:"..lives,1,1,7)
+	print("score:"..points,40,1,7)
 end
 
-function gameover()
-	mode="gameover"
+
+function draw_over()
+	rectfill(0,60,128,75,0)
+	print("game over", 46,62,7)
+	print("press ❎ to restart",27,68,6)
 end
 
-function serveball() 
-	ball_x=1
-	ball_y=33
-	
-	ball_dx=1
-	ball_dy=2
+-- ############## NATIVE
+
+function _init()
+	cls()
+	mode="start"
 end
 
-function startgame()
-	ball_r=2	
-	ball_dr=0.5
-
-	col=10
-	paddle_col=7
-
-	pad_x=52
-	pad_y=120
-	pad_w=24
-	pad_h=3
-
-	pad_dx=0
-
-	pad_speed=2.5
-
-	--brick_y=20
-	brick_w=10
-	brick_h=4
-	buildbricks()
-
-	mode="game"
-
-	lives=3
-	points=0
-	serveball()
-end
-
-function buildbricks()
-	brick_x={}
-	brick_y={}
-	brick_v={}
-
-	local i
-	for i=1,10 do
-		add(brick_x, 5+(i-1)*(brick_w+2))
-		add(brick_y, 20)
-		add(brick_v, true)
+function _update60()
+	if mode =="start" then
+		update_start()
+	elseif mode == "game" then
+		update_game()
+	elseif mode == "gameover" then
+		updade_over()
 	end
 end
 
-function hit_ballbox(bx,by,tx,ty,tw,th)
-	if by-ball_r > ty+th then return false end
-	if by+ball_r < ty then return false end
-	if bx-ball_r > tx+tw then return false end
-	if bx+ball_r < tx then return false end
-	return true
-end
-
-function deflx_ballbox(bx,by,bdx,bdy,tx,ty,tw,th)
-	-- calculate wether to deflect the ball
-	-- horizontally or vertically when it hits a box
-	if bdx == 0 then
-	 -- moving vertically
-	 return false
-	elseif bdy == 0 then
-	 -- moving horizontally
-	 return true
-	else
-	 -- moving diagonally
-	 -- calculate slope
-	 local slp = bdy / bdx
-	 local cx, cy
-	 -- check variants
-	 if slp > 0 and bdx > 0 then
-		-- moving down right
-		debug1="q1"
-		cx = tx-bx
-		cy = ty-by
-		if cx<=0 then
-		 return false
-		elseif cy/cx < slp then
-		 return true
-		else
-		 return false
-		end
-	 elseif slp < 0 and bdx > 0 then
-		debug1="q2"
-		-- moving up right
-		cx = tx-bx
-		cy = ty+th-by
-		if cx<=0 then
-		 return false
-		elseif cy/cx < slp then
-		 return false
-		else
-		 return true
-		end
-	 elseif slp > 0 and bdx < 0 then
-		debug1="q3"
-		-- moving left up
-		cx = tx+tw-bx
-		cy = ty+th-by
-		if cx>=0 then
-		 return false
-		elseif cy/cx > slp then
-		 return false
-		else
-		 return true
-		end
-	 else
-		-- moving left down
-		debug1="q4"
-		cx = tx+tw-bx
-		cy = ty-by
-		if cx>=0 then
-		 return false
-		elseif cy/cx < slp then
-		 return false
-		else
-		 return true
-		end
-	 end
+function _draw()
+	if mode =="start" then
+		draw_start()
+	elseif mode == "game" then
+		draw_game()
+	elseif mode == "gameover" then
+		draw_over()
 	end
-	return false
 end
-
-
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
