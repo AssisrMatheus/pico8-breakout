@@ -72,13 +72,15 @@ end
 
 -- makes a new ball
 function serveball() 
+	sticky=true
+
 	--ball position
-	ball_x=10
-	ball_y=70
+	ball_x=pad_x+flr(pad_w/2)
+	ball_y=pad_y-ball_r-1
 	
 	-- ball speed
 	ball_dx=1
-	ball_dy=1
+	ball_dy=-1
 end
 
 -- A function that starts/restarts the game
@@ -148,6 +150,10 @@ function update_game()
 		pad_dx=-pad_speed
 		button_press=true
 		--pad_x-=pad_speed
+
+		if sticky then
+			ball_dx=-1
+		 end
 	end
 
 	--right
@@ -155,6 +161,14 @@ function update_game()
 		pad_dx=pad_speed
 		button_press=true
 		--pad_x+=pad_speed
+
+		if sticky then
+			ball_dx=1
+		 end
+	end
+
+	if sticky and btnp(❎) then
+		sticky = false
 	end
 	
 	-- if the user is not pressing the button, slows down the paddle
@@ -171,88 +185,96 @@ function update_game()
 	
 	local next_x, next_y
 
-	-- get the next position of the ball
-	next_x = ball_x+ball_dx 
-	next_y = ball_y+ball_dy
-
-	-- if the next position is out of bounds in the sides
- if next_x > 124 or next_x < 3 then
-	-- make sure it stays inbounds
-	next_x = mid(0, next_x, 127)
-
-	-- reflect the ball to the opposite side
- 	ball_dx = -ball_dx
- 	sfx(0)
- end
-
- -- if the next position is out of bounds in the top section
- if next_y < 10 then
-	-- make sure it stays inbounds
-	next_y = mid(10, next_y, 127)
-
-	-- reflect the ball to the opposite side
- 	ball_dy = -ball_dy
- 	sfx(0)
- end
-
- -- If ball hit the pad
- if hit_ballbox(next_x, next_y, pad_x, pad_y, pad_w, pad_h) then
-	points+=1
-	if deflx_ballbox(ball_x, ball_y, ball_dx, ball_dy, pad_x, pad_y, pad_w, pad_h) then
-		ball_dx = -ball_dx
-		if ball_x < pad_x+(pad_w/2) then
-			next_x = pad_x-ball_r
-		else
-			next_x = pad_x+pad_w+ball_r
-		end
+	
+	if sticky then
+		ball_x=pad_x+flr(pad_w/2)
+		ball_y=pad_y-ball_r-1
 	else
-		ball_dy = -ball_dy
+		-- get the next position of the ball
+		next_x = ball_x+ball_dx 
+		next_y = ball_y+ball_dy
 
-		if ball_y > pad_y then
-			next_y=pad_y+pad_h+ball_r
-		else
-			next_y=pad_y-ball_r
+		-- if the next position is out of bounds in the sides
+		if next_x > 124 or next_x < 3 then
+			-- make sure it stays inbounds
+			next_x = mid(0, next_x, 127)
+		
+			-- reflect the ball to the opposite side
+			ball_dx = -ball_dx
+			sfx(0)
+		end
+		
+		-- if the next position is out of bounds in the top section
+		if next_y < 10 then
+			-- make sure it stays inbounds
+			next_y = mid(10, next_y, 127)
+		
+			-- reflect the ball to the opposite side
+			ball_dy = -ball_dy
+			sfx(0)
+		end
+		
+		-- If ball hit the pad
+		if hit_ballbox(next_x, next_y, pad_x, pad_y, pad_w, pad_h) then
+			points+=1
+			if deflx_ballbox(ball_x, ball_y, ball_dx, ball_dy, pad_x, pad_y, pad_w, pad_h) then
+				ball_dx = -ball_dx
+				if ball_x < pad_x+(pad_w/2) then
+					next_x = pad_x-ball_r
+				else
+					next_x = pad_x+pad_w+ball_r
+				end
+			else
+				ball_dy = -ball_dy
+		
+				if ball_y > pad_y then
+					next_y=pad_y+pad_h+ball_r
+				else
+					next_y=pad_y-ball_r
+				end
+		
+			end
+			sfx(1)
+		end
+		
+		-- for each brick
+		local brick_hit = false
+		local i
+		for i=1,#brick_x do
+			-- check if ball hit brick
+			if brick_v[i] and hit_ballbox(next_x, next_y, brick_x[i], brick_y[i], brick_w, brick_h) then
+				if not brick_hit then
+					sfx(3)
+					brick_hit = true
+					if deflx_ballbox(ball_x, ball_y, ball_dx, ball_dy, brick_x[i], brick_y[i], brick_w, brick_h) then
+						ball_dx = -ball_dx
+					else
+						ball_dy = -ball_dy
+					end
+				end
+		
+				points+=10
+				brick_v[i] = false
+			end
+		end
+		
+		ball_x = next_x
+		ball_y = next_y 
+		
+		-- if the next position is out of bounds in the bottom section
+		if next_y > 127 then
+			sfx(2)
+			lives-=1
+			if lives < 0 then
+				gameover()
+			else
+				serveball()
+			end	
+			return
 		end
 
 	end
-	sfx(1)
- end
 
- -- for each brick
- local brick_hit = false
- local i
- for i=1,#brick_x do
-	-- check if ball hit brick
-	if brick_v[i] and hit_ballbox(next_x, next_y, brick_x[i], brick_y[i], brick_w, brick_h) then
-		if not brick_hit then
-			sfx(3)
-			brick_hit = true
-			if deflx_ballbox(ball_x, ball_y, ball_dx, ball_dy, brick_x[i], brick_y[i], brick_w, brick_h) then
-				ball_dx = -ball_dx
-			else
-				ball_dy = -ball_dy
-			end
-		end
-
-		points+=10
-		brick_v[i] = false
-	 end
-end
- 
- ball_x = next_x
- ball_y = next_y 
-
- -- if the next position is out of bounds in the bottom section
- if next_y > 127 then
-	sfx(2)
-	lives-=1
-	if lives < 0 then
-		gameover()
-	else
-		serveball()
-	end	
-	return
- end
 end
 
 function updade_over()
@@ -274,6 +296,10 @@ function draw_game()
 	
 	-- draw the ball
 	circfill(ball_x,ball_y,ball_r,col)
+	
+	if sticky then
+		line(ball_x+ball_dx*4,ball_y+ball_dy*4,ball_x+ball_dx*6,ball_y+ball_dy*6,10)
+	end
 
 	-- draw the paddle	
 	rectfill(pad_x,pad_y, pad_x+pad_w,pad_y+pad_h,paddle_col)
