@@ -200,23 +200,40 @@ function update_game()
 	points+=1
 	if deflx_ballbox(ball_x, ball_y, ball_dx, ball_dy, pad_x, pad_y, pad_w, pad_h) then
 		ball_dx = -ball_dx
+		if ball_x < pad_x+(pad_w/2) then
+			next_x = pad_x-ball_r
+		else
+			next_x = pad_x+pad_w+ball_r
+		end
 	else
 		ball_dy = -ball_dy
+
+		if ball_y > pad_y then
+			next_y=pad_y+pad_h+ball_r
+		else
+			next_y=pad_y-ball_r
+		end
+
 	end
 	sfx(1)
  end
 
  -- for each brick
+ local brick_hit = false
  local i
  for i=1,#brick_x do
 	-- check if ball hit brick
 	if brick_v[i] and hit_ballbox(next_x, next_y, brick_x[i], brick_y[i], brick_w, brick_h) then
-		if deflx_ballbox(ball_x, ball_y, ball_dx, ball_dy, brick_x[i], brick_y[i], brick_w, brick_h) then
-			ball_dx = -ball_dx
-		else
-			ball_dy = -ball_dy
+		if not brick_hit then
+			sfx(3)
+			brick_hit = true
+			if deflx_ballbox(ball_x, ball_y, ball_dx, ball_dy, brick_x[i], brick_y[i], brick_w, brick_h) then
+				ball_dx = -ball_dx
+			else
+				ball_dy = -ball_dy
+			end
 		end
-		sfx(3)
+
 		points+=10
 		brick_v[i] = false
 	 end
