@@ -72,6 +72,7 @@ function update_game()
 	end
 	
 	pad_x+=pad_dx
+	pad_x=mid(0, pad_x, 127-pad_w)
 
 	next_x = ball_x+ball_dx 
 	next_y = ball_y+ball_dy
@@ -99,6 +100,7 @@ function update_game()
 	return
  end
 
+ -- check if ball hit pad
  if hit_ballbox(next_x, next_y, pad_x, pad_y, pad_w, pad_h) then
 	points+=1
 	if deflx_ballbox(ball_x, ball_y, ball_dx, ball_dy, pad_x, pad_y, pad_w, pad_h) then
@@ -108,6 +110,21 @@ function update_game()
 	end
 	sfx(1)
  end
+
+ local i
+ for i=1,#brick_x do
+	-- check if ball hit brick
+	if brick_v[i] and hit_ballbox(next_x, next_y, brick_x[i], brick_y[i], brick_w, brick_h) then
+		if deflx_ballbox(ball_x, ball_y, ball_dx, ball_dy, brick_x[i], brick_y[i], brick_w, brick_h) then
+			ball_dx = -ball_dx
+		else
+			ball_dy = -ball_dy
+		end
+		sfx(3)
+		points+=10
+		brick_v[i] = false
+	 end
+end
  
  ball_x = next_x
  ball_y = next_y
@@ -121,6 +138,14 @@ function draw_game()
 
 	-- draw the paddle	
 	rectfill(pad_x,pad_y, pad_x+pad_w,pad_y+pad_h,paddle_col)
+
+	local i
+	for i=1,#brick_x do
+		-- draw bricks
+		if brick_v[i] then
+			rectfill(brick_x[i],brick_y[i], brick_x[i]+brick_w,brick_y[i]+brick_h,14)
+		end
+	end
 
 	rectfill(0,0, 128, 6, 2)
 	print("lives "..lives, 1,1,7)
@@ -155,11 +180,29 @@ function startgame()
 
 	pad_speed=2.5
 
+	--brick_y=20
+	brick_w=10
+	brick_h=4
+	buildbricks()
+
 	mode="game"
 
 	lives=3
 	points=0
 	serveball()
+end
+
+function buildbricks()
+	brick_x={}
+	brick_y={}
+	brick_v={}
+
+	local i
+	for i=1,10 do
+		add(brick_x, 5+(i-1)*(brick_w+2))
+		add(brick_y, 20)
+		add(brick_v, true)
+	end
 end
 
 function hit_ballbox(bx,by,tx,ty,tw,th)
@@ -380,3 +423,4 @@ __sfx__
 0001000012230132201422015220182101c210202102021004200032000120000200002000020000200002000020000200000000d2000b2000820007200062000420002200002000020003000020000000000000
 0001000008750097500b7500c7500d7500e7500d7500a750000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000200001b4501745014450124500f4500b4500a45009450063500535004340023400033000330003500035000350003500000000000000000000000000000000000000000000000000000000000000000000000
+0003000004450034500345005450094100a4001a4001c400016000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
