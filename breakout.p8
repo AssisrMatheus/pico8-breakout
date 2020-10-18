@@ -1,34 +1,58 @@
 pico-8 cartridge // http://www.pico-8.com
 version 29
 __lua__
-ball_x=24/2
-ball_y=87/2
-
-ball_r=2
-
-ball_dx=2
-ball_dy=2
-ball_dr=0.5
-
-col=10
-paddle_col=7
-
-pad_x=52
-pad_y=120
-pad_w=24
-pad_h=3
-
-pad_dx=5
-
-pad_speed=5
-
 function _init()
 	cls()
+	mode="start"
 end
 
 function _update60()
-	button_press=false
+	if mode =="game" then
+		update_game()
+	elseif mode == "start" then
+		update_start()
+	elseif mode == "gameover" then
+		update_gameover()
+	end
+end
 
+function _draw()
+	if mode =="game" then
+		draw_game()
+	elseif mode == "start" then
+		draw_start()
+	elseif mode == "gameover" then
+		draw_gameover()
+	end
+end
+
+function draw_start()
+	print('pico hero breakout', 30, 40, 7)
+	print('press ❎ to start',32,80,11)
+end
+
+function draw_gameover()
+	rectfill(0, 60, 128, 75, 0)
+	print("game over", 45, 62, 7)
+	print("press ❎ to restart", 25, 69, 6)
+end
+
+function update_start()
+	if btn(❎) then
+		startgame()
+	end
+end
+
+function update_gameover()
+	if btn(❎) then
+		startgame()
+	end
+end
+
+function update_game()
+	local button_press=false 
+	local next_x, next_y
+	
 	--left
 	if btn(⬅️) then
 		pad_dx=-pad_speed
@@ -44,44 +68,177 @@ function _update60()
 	end
 	
 	if not button_press then
-		pad_dx=pad_dx/2.3
+		pad_dx=pad_dx/1.4
 	end
 	
 	pad_x+=pad_dx
 
- if ball_x > 127 or ball_x < 0 then
+	next_x = ball_x+ball_dx 
+	next_y = ball_y+ball_dy
+
+ if next_x > 127 or next_x < 0 then
+	next_x = mid(0, next_x, 127)
  	ball_dx = -ball_dx
  	sfx(0)
  end
 
- if ball_y > 127 or ball_y < 0 then
+ if next_y < 10 then
+	next_y = mid(10, next_y, 127)
  	ball_dy = -ball_dy
  	sfx(0)
  end
- 
- ball_x+=ball_dx
- ball_y+=ball_dy
- 
- 
- if ball_box(pad_x, pad_y, pad_w, pad_h) then
- 	-- deal with collision
+
+ if next_y > 127 then
+	sfx(2)
+	lives-=1
+	if lives < 0 then
+		gameover()
+	else
+		serveball()
+	end	
+	return
  end
+
+ if hit_ballbox(next_x, next_y, pad_x, pad_y, pad_w, pad_h) then
+	points+=1
+	if deflx_ballbox(ball_x, ball_y, ball_dx, ball_dy, pad_x, pad_y, pad_w, pad_h) then
+		ball_dx = -ball_dx
+	else
+		ball_dy = -ball_dy
+	end
+	sfx(1)
+ end
+ 
+ ball_x = next_x
+ ball_y = next_y
 end
 
-function _draw()
-	-- fills the screen background
-	rectfill(0,0,127,127,1)
+function draw_game()
+	cls(1)
 	
 	-- draw the ball
 	circfill(ball_x,ball_y,ball_r,col)
 
 	-- draw the paddle	
 	rectfill(pad_x,pad_y, pad_x+pad_w,pad_y+pad_h,paddle_col)
+
+	rectfill(0,0, 128, 6, 2)
+	print("lives "..lives, 1,1,7)
+	print("score "..points, 40,1,7)
 end
 
-function ball_box(box_x, box_y, box_w, box_h)
+function gameover()
+	mode="gameover"
+end
+
+function serveball() 
+	ball_x=1
+	ball_y=33
+	
+	ball_dx=1
+	ball_dy=2
+end
+
+function startgame()
+	ball_r=2	
+	ball_dr=0.5
+
+	col=10
+	paddle_col=7
+
+	pad_x=52
+	pad_y=120
+	pad_w=24
+	pad_h=3
+
+	pad_dx=0
+
+	pad_speed=2.5
+
+	mode="game"
+
+	lives=3
+	points=0
+	serveball()
+end
+
+function hit_ballbox(bx,by,tx,ty,tw,th)
+	if by-ball_r > ty+th then return false end
+	if by+ball_r < ty then return false end
+	if bx-ball_r > tx+tw then return false end
+	if bx+ball_r < tx then return false end
+	return true
+end
+
+function deflx_ballbox(bx,by,bdx,bdy,tx,ty,tw,th)
+	-- calculate wether to deflect the ball
+	-- horizontally or vertically when it hits a box
+	if bdx == 0 then
+	 -- moving vertically
+	 return false
+	elseif bdy == 0 then
+	 -- moving horizontally
+	 return true
+	else
+	 -- moving diagonally
+	 -- calculate slope
+	 local slp = bdy / bdx
+	 local cx, cy
+	 -- check variants
+	 if slp > 0 and bdx > 0 then
+		-- moving down right
+		debug1="q1"
+		cx = tx-bx
+		cy = ty-by
+		if cx<=0 then
+		 return false
+		elseif cy/cx < slp then
+		 return true
+		else
+		 return false
+		end
+	 elseif slp < 0 and bdx > 0 then
+		debug1="q2"
+		-- moving up right
+		cx = tx-bx
+		cy = ty+th-by
+		if cx<=0 then
+		 return false
+		elseif cy/cx < slp then
+		 return false
+		else
+		 return true
+		end
+	 elseif slp > 0 and bdx < 0 then
+		debug1="q3"
+		-- moving left up
+		cx = tx+tw-bx
+		cy = ty+th-by
+		if cx>=0 then
+		 return false
+		elseif cy/cx > slp then
+		 return false
+		else
+		 return true
+		end
+	 else
+		-- moving left down
+		debug1="q4"
+		cx = tx+tw-bx
+		cy = ty-by
+		if cx>=0 then
+		 return false
+		elseif cy/cx < slp then
+		 return false
+		else
+		 return true
+		end
+	 end
+	end
 	return false
 end
+
+
 __gfx__
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -220,4 +377,6 @@ __label__
 88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
 
 __sfx__
-0001000012230132201422015220182101c2102021020210042000320001200002000020000200002000020000200002000e2000d2000b2000820007200062000420002200002000020003000020000000000000
+0001000012230132201422015220182101c210202102021004200032000120000200002000020000200002000020000200000000d2000b2000820007200062000420002200002000020003000020000000000000
+0001000008750097500b7500c7500d7500e7500d7500a750000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+000200001b4501745014450124500f4500b4500a45009450063500535004340023400033000330003500035000350003500000000000000000000000000000000000000000000000000000000000000000000000
